@@ -1,26 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCodeForToken } from "@/lib/lark";
+import { exchangeCodeForToken, getAppAccessToken } from "@/lib/lark";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
-  const state = searchParams.get("state");
 
   if (!code) {
     return NextResponse.json({ error: "Missing code parameter" }, { status: 400 });
   }
 
   try {
-    console.log("Attempting to exchange code for token...");
     const data = await exchangeCodeForToken(code);
-    console.log("Token exchange response:", JSON.stringify(data));
 
     if (data.code !== 0) {
       return NextResponse.redirect(new URL(`/?status=error&msg=${encodeURIComponent(data.msg)}`, request.url));
     }
 
+    const tenantToken = await getAppAccessToken();
+
     const response = NextResponse.redirect(new URL("/?status=success", request.url));
-    response.cookies.set("lark_access_token", data.data.access_token, {
+    response.cookies.set("lark_user_token", data.data.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: data.data.expires_in,
@@ -30,6 +29,12 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: data.data.refresh_expires_in,
+      path: "/",
+    });
+    response.cookies.set("lark_tenant_token", tenantToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 2 * 3600,
       path: "/",
     });
 

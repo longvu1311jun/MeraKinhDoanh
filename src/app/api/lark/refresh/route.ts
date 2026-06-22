@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { refreshAccessToken } from "@/lib/lark";
+import { refreshAccessToken, getAppAccessToken } from "@/lib/lark";
 
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get("lark_refresh_token")?.value;
@@ -15,8 +15,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: data.msg }, { status: 400 });
     }
 
+    const tenantToken = await getAppAccessToken();
+
     const response = NextResponse.json({ success: true });
-    response.cookies.set("lark_access_token", data.data.access_token, {
+    response.cookies.set("lark_user_token", data.data.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: data.data.expires_in,
@@ -26,6 +28,12 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: data.data.refresh_expires_in,
+      path: "/",
+    });
+    response.cookies.set("lark_tenant_token", tenantToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 2 * 3600,
       path: "/",
     });
 

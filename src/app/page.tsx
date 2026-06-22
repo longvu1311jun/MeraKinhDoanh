@@ -3,10 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 
 interface TokenInfo {
-  accessToken: string;
+  userToken: string;
   refreshToken: string;
-  expiresAt: number;
-  refreshExpiresAt: number;
+  tenantToken: string | null;
+  userTokenExpiresAt: number;
+  refreshTokenExpiresAt: number;
+  tenantTokenExpiresAt: number;
 }
 
 interface AuthStatus {
@@ -31,10 +33,12 @@ export default function HomePage() {
         const data = await res.json();
         if (data.authenticated) {
           setTokenInfo({
-            accessToken: data.accessToken,
+            userToken: data.userToken,
             refreshToken: data.refreshToken,
-            expiresAt: data.accessTokenExpiresAt,
-            refreshExpiresAt: data.refreshTokenExpiresAt,
+            tenantToken: data.tenantToken,
+            userTokenExpiresAt: data.userTokenExpiresAt,
+            refreshTokenExpiresAt: data.refreshTokenExpiresAt,
+            tenantTokenExpiresAt: data.tenantTokenExpiresAt,
           });
           setAuthStatus({ authenticated: true, status: null, errorMsg: null });
         } else {
@@ -100,11 +104,11 @@ export default function HomePage() {
   }, [checkAuth]);
 
   useEffect(() => {
-    if (!tokenInfo?.expiresAt || !autoRefreshEnabled) return;
+    if (!tokenInfo?.userTokenExpiresAt || !autoRefreshEnabled) return;
 
     const checkAndRefresh = () => {
-      const timeLeft = tokenInfo.expiresAt - Date.now();
-      setTimeUntilRefresh(formatTimeLeft(tokenInfo.expiresAt));
+      const timeLeft = tokenInfo.userTokenExpiresAt - Date.now();
+      setTimeUntilRefresh(formatTimeLeft(tokenInfo.userTokenExpiresAt));
 
       if (timeLeft <= 5 * 60 * 1000 && timeLeft > 0) {
         refreshToken();
@@ -226,19 +230,31 @@ export default function HomePage() {
 
         <div style={{ display: "grid", gap: "16px" }}>
           <TokenCard
-            title="Access Token"
-            value={tokenInfo?.accessToken || ""}
-            expiresAt={tokenInfo?.expiresAt ?? null}
+            title="User Token"
+            description="Dùng để xác thực người dùng"
+            value={tokenInfo?.userToken || ""}
+            expiresAt={tokenInfo?.userTokenExpiresAt ?? null}
             formatTime={formatTimeLeft}
             color="#3b82f6"
           />
           <TokenCard
             title="Refresh Token"
+            description="Dùng để lấy User Token mới"
             value={tokenInfo?.refreshToken || ""}
-            expiresAt={tokenInfo?.refreshExpiresAt ?? null}
+            expiresAt={tokenInfo?.refreshTokenExpiresAt ?? null}
             formatTime={formatTimeLeft}
             color="#8b5cf6"
           />
+          {tokenInfo?.tenantToken && (
+            <TokenCard
+              title="Tenant Token"
+              description="Dùng để gọi API Lark thay app"
+              value={tokenInfo.tenantToken}
+              expiresAt={tokenInfo?.tenantTokenExpiresAt ?? null}
+              formatTime={formatTimeLeft}
+              color="#f59e0b"
+            />
+          )}
         </div>
 
         <div style={{
@@ -270,7 +286,7 @@ export default function HomePage() {
             }}>
               <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>Access Token sẽ hết hạn sau</div>
               <div style={{ fontSize: "1.25rem", fontWeight: 700, color: timeUntilRefresh === "Đã hết hạn" ? "#ef4444" : "#3b82f6" }}>
-                {timeUntilRefresh || formatTimeLeft(tokenInfo?.expiresAt ?? null)}
+                {timeUntilRefresh || formatTimeLeft(tokenInfo?.userTokenExpiresAt ?? null)}
               </div>
             </div>
             <div style={{
@@ -326,8 +342,9 @@ export default function HomePage() {
   );
 }
 
-function TokenCard({ title, value, expiresAt, formatTime, color }: {
+function TokenCard({ title, description, value, expiresAt, formatTime, color }: {
   title: string;
+  description?: string;
   value: string;
   expiresAt: number | null;
   formatTime: (t: number | null) => string;
@@ -349,10 +366,15 @@ function TokenCard({ title, value, expiresAt, formatTime, color }: {
       boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: color }} />
-          <span style={{ fontWeight: 600, color: "#0f172a" }}>{title}</span>
-        </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: color }} />
+            <span style={{ fontWeight: 600, color: "#0f172a" }}>{title}</span>
+          </div>
+          {description && (
+            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "2px", gridColumn: "1 / -1" }}>
+              {description}
+            </div>
+          )}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{
             fontSize: "0.75rem",
