@@ -206,14 +206,14 @@ export default function HomePage() {
           <TokenCard
             title="Access Token"
             value={tokenInfo?.accessToken || ""}
-            expiresAt={tokenInfo?.expiresAt}
+            expiresAt={tokenInfo?.expiresAt ?? null}
             formatTime={formatTimeLeft}
             color="#3b82f6"
           />
           <TokenCard
             title="Refresh Token"
             value={tokenInfo?.refreshToken || ""}
-            expiresAt={tokenInfo?.refreshExpiresAt}
+            expiresAt={tokenInfo?.refreshExpiresAt ?? null}
             formatTime={formatTimeLeft}
             color="#8b5cf6"
           />
@@ -248,7 +248,7 @@ export default function HomePage() {
             }}>
               <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>Access Token sẽ hết hạn sau</div>
               <div style={{ fontSize: "1.25rem", fontWeight: 700, color: timeUntilRefresh === "Đã hết hạn" ? "#ef4444" : "#3b82f6" }}>
-                {timeUntilRefresh || formatTimeLeft(tokenInfo?.expiresAt || null)}
+                {timeUntilRefresh || formatTimeLeft(tokenInfo?.expiresAt ?? null)}
               </div>
             </div>
             <div style={{
