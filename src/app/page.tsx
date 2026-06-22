@@ -5,8 +5,8 @@ import { useEffect, useState, useCallback } from "react";
 interface TokenInfo {
   accessToken: string;
   refreshToken: string;
-  expiresAt: number | null;
-  refreshExpiresAt: number | null;
+  expiresAt: number;
+  refreshExpiresAt: number;
 }
 
 interface AuthStatus {
@@ -22,36 +22,36 @@ export default function HomePage() {
   const [timeUntilRefresh, setTimeUntilRefresh] = useState<string>("");
   const [lastRefresh, setLastRefresh] = useState<string>("");
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const checkAuth = useCallback(() => {
-    const cookies = document.cookie.split("; ");
-    const accessToken = cookies.find((c) => c.startsWith("lark_access_token="))?.split("=")[1];
-    const refreshToken = cookies.find((c) => c.startsWith("lark_refresh_token="))?.split("=")[1];
-
-    if (accessToken && refreshToken) {
-      const expiresAt = getCookieExpiry("lark_access_token");
-      const refreshExpiresAt = getCookieExpiry("lark_refresh_token");
-      setTokenInfo({ accessToken, refreshToken, expiresAt, refreshExpiresAt });
-      setAuthStatus({ authenticated: true, status: null, errorMsg: null });
-    } else {
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/lark/tokens");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated) {
+          setTokenInfo({
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+            expiresAt: data.accessTokenExpiresAt,
+            refreshExpiresAt: data.refreshTokenExpiresAt,
+          });
+          setAuthStatus({ authenticated: true, status: null, errorMsg: null });
+        } else {
+          setTokenInfo(null);
+          setAuthStatus((prev) => ({ ...prev, authenticated: false }));
+        }
+      } else {
+        setTokenInfo(null);
+        setAuthStatus((prev) => ({ ...prev, authenticated: false }));
+      }
+    } catch {
       setTokenInfo(null);
       setAuthStatus((prev) => ({ ...prev, authenticated: false }));
+    } finally {
+      setIsLoading(false);
     }
   }, []);
-
-  const getCookieExpiry = (name: string): number | null => {
-    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-    if (!match) return null;
-    const expiresMatch = document.cookie.match(new RegExp(`${name}=[^;]+;\\s*expires=([^;]+)`));
-    if (expiresMatch) {
-      return new Date(expiresMatch[1]).getTime();
-    }
-    const maxAgeMatch = document.cookie.match(new RegExp(`${name}=[^;]+;\\s*max-age=([^;]+)`));
-    if (maxAgeMatch) {
-      return Date.now() + parseInt(maxAgeMatch[1]) * 1000;
-    }
-    return Date.now() + 7200 * 1000;
-  };
 
   const refreshToken = useCallback(async () => {
     setIsRefreshing(true);
@@ -61,7 +61,7 @@ export default function HomePage() {
       if (data.error) {
         console.error("Refresh failed:", data.error);
       } else {
-        checkAuth();
+        await checkAuth();
         setLastRefresh(new Date().toLocaleTimeString("vi-VN"));
       }
     } catch (err) {
@@ -71,7 +71,7 @@ export default function HomePage() {
     }
   }, [checkAuth]);
 
-  const formatTimeLeft = (expiresAt: number | null): string => {
+  const formatTimeLeft = useCallback((expiresAt: number | null): string => {
     if (!expiresAt) return "Không rõ";
     const diff = expiresAt - Date.now();
     if (diff <= 0) return "Đã hết hạn";
@@ -81,7 +81,7 @@ export default function HomePage() {
     if (hours > 0) return `${hours}h ${minutes}m`;
     if (minutes > 0) return `${minutes}m ${seconds}s`;
     return `${seconds}s`;
-  };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -103,11 +103,10 @@ export default function HomePage() {
     if (!tokenInfo?.expiresAt || !autoRefreshEnabled) return;
 
     const checkAndRefresh = () => {
-      const timeLeft = tokenInfo.expiresAt! - Date.now();
+      const timeLeft = tokenInfo.expiresAt - Date.now();
       setTimeUntilRefresh(formatTimeLeft(tokenInfo.expiresAt));
 
       if (timeLeft <= 5 * 60 * 1000 && timeLeft > 0) {
-        console.log("Token sắp hết hạn, tự động refresh...");
         refreshToken();
       }
     };
@@ -115,11 +114,34 @@ export default function HomePage() {
     checkAndRefresh();
     const interval = setInterval(checkAndRefresh, 10000);
     return () => clearInterval(interval);
-  }, [tokenInfo, autoRefreshEnabled, refreshToken]);
+  }, [tokenInfo, autoRefreshEnabled, refreshToken, formatTimeLeft]);
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-  };
+  if (isLoading) {
+    return (
+      <main style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "system-ui, sans-serif",
+        background: "#f8fafc",
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{
+            width: "40px",
+            height: "40px",
+            border: "4px solid #e2e8f0",
+            borderTopColor: "#3b82f6",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+            margin: "0 auto 16px",
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ color: "#64748b" }}>Đang tải...</p>
+        </div>
+      </main>
+    );
+  }
 
   if (!authStatus.authenticated && !tokenInfo) {
     return (
