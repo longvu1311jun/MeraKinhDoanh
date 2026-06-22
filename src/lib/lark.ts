@@ -24,6 +24,10 @@ export interface LarkAppTokenResponse {
 }
 
 export async function getAppAccessToken(): Promise<string> {
+  if (!process.env.LARK_APP_ID || !process.env.LARK_APP_SECRET) {
+    throw new Error("Missing LARK_APP_ID or LARK_APP_SECRET environment variables");
+  }
+
   const res = await fetch(`${LARK_AUTH_V3}/app_access_token/internal/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,8 +38,12 @@ export async function getAppAccessToken(): Promise<string> {
   });
 
   const data: LarkAppTokenResponse = await res.json();
-  if (data.code !== 0) {
-    throw new Error(`Failed to get app access token: ${data.msg}`);
+
+  if (!res.ok || data.code !== 0) {
+    throw new Error(`Failed to get app access token: ${data.msg} (code: ${data.code})`);
+  }
+  if (!data.data?.app_access_token) {
+    throw new Error(`Invalid response from Lark: ${JSON.stringify(data)}`);
   }
   return data.data.app_access_token;
 }
