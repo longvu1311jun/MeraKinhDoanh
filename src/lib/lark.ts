@@ -2,7 +2,7 @@ const LARK_API_BASE = "https://open.larksuite.com/open-apis";
 const LARK_AUTH_BASE = `${LARK_API_BASE}/authen/v1`;
 const LARK_AUTH_V3 = `${LARK_API_BASE}/auth/v3`;
 
-export interface LarkTokenResponse {
+export interface LarkUserTokenResponse {
   code: number;
   msg: string;
   data: {
@@ -14,13 +14,12 @@ export interface LarkTokenResponse {
   };
 }
 
-export interface LarkAppTokenResponse {
+interface LarkAppTokenResponse {
   code: number;
   msg: string;
-  data: {
-    app_access_token: string;
-    expire: number;
-  };
+  expire?: number;
+  app_access_token?: string;
+  tenant_access_token?: string;
 }
 
 export async function getAppAccessToken(): Promise<string> {
@@ -30,7 +29,6 @@ export async function getAppAccessToken(): Promise<string> {
 
   const url = `${LARK_AUTH_V3}/app_access_token/internal/`;
   console.log("Requesting app access token from:", url);
-  console.log("With app_id:", process.env.LARK_APP_ID);
 
   const res = await fetch(url, {
     method: "POST",
@@ -41,25 +39,23 @@ export async function getAppAccessToken(): Promise<string> {
     }),
   });
 
-  console.log("Response status:", res.status);
-  console.log("Response headers:", JSON.stringify(Object.fromEntries(res.headers.entries())));
+  const data: LarkTokenResponse = await res.json();
 
-  const rawText = await res.text();
-  console.log("Raw response:", rawText);
-
-  const data: LarkAppTokenResponse = JSON.parse(rawText);
-  console.log("Parsed data:", JSON.stringify(data));
-
-  if (!res.ok || data.code !== 0) {
+  if (data.code !== 0) {
     throw new Error(`Failed to get app access token: ${data.msg} (code: ${data.code})`);
   }
-  if (!data.data?.app_access_token) {
-    throw new Error(`Invalid response from Lark: ${rawText}`);
+
+  if (data.app_access_token) {
+    return data.app_access_token;
   }
-  return data.data.app_access_token;
+  if (data.tenant_access_token) {
+    return data.tenant_access_token;
+  }
+
+  throw new Error(`No app_access_token or tenant_access_token in response`);
 }
 
-export async function exchangeCodeForToken(code: string): Promise<LarkTokenResponse> {
+export async function exchangeCodeForToken(code: string): Promise<LarkUserTokenResponse> {
   const appAccessToken = await getAppAccessToken();
 
   const res = await fetch(`${LARK_AUTH_BASE}/access_token`, {
@@ -77,7 +73,7 @@ export async function exchangeCodeForToken(code: string): Promise<LarkTokenRespo
   return res.json();
 }
 
-export async function refreshAccessToken(refreshToken: string): Promise<LarkTokenResponse> {
+export async function refreshAccessToken(refreshToken: string): Promise<LarkUserTokenResponse> {
   const appAccessToken = await getAppAccessToken();
 
   const res = await fetch(`${LARK_AUTH_BASE}/refresh_access_token`, {
