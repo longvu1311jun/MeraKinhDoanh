@@ -39,16 +39,18 @@ export async function getAppAccessToken(): Promise<string> {
     }),
   });
 
-  const data: LarkTokenResponse = await res.json();
+  const data = await res.json() as LarkAppTokenResponse;
 
   if (data.code !== 0) {
     throw new Error(`Failed to get app access token: ${data.msg} (code: ${data.code})`);
   }
 
   if (data.app_access_token) {
+    console.log("Got app_access_token");
     return data.app_access_token;
   }
   if (data.tenant_access_token) {
+    console.log("Got tenant_access_token");
     return data.tenant_access_token;
   }
 
