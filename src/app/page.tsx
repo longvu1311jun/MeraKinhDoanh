@@ -21,6 +21,13 @@ export default function HomePage() {
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>({ authenticated: false, status: null, errorMsg: null });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    departments: { inserted: number; updated: number; skippedDeleted: number };
+    employees: { inserted: number; updated: number };
+    duration_ms: number;
+  } | null>(null);
+  const [syncError, setSyncError] = useState<string>("");
   const [timeUntilRefresh, setTimeUntilRefresh] = useState<string>("");
   const [lastRefresh, setLastRefresh] = useState<string>("");
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
@@ -74,6 +81,25 @@ export default function HomePage() {
       setIsRefreshing(false);
     }
   }, [checkAuth]);
+
+  const syncAll = useCallback(async () => {
+    setIsSyncing(true);
+    setSyncError("");
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/lark/sync", { method: "POST" });
+      const data = await res.json();
+      if (data.error) {
+        setSyncError(data.error);
+      } else {
+        setSyncResult(data);
+      }
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
 
   const formatTimeLeft = useCallback((expiresAt: number | null): string => {
     if (!expiresAt) return "Không rõ";
@@ -323,6 +349,81 @@ export default function HomePage() {
           <p style={{ fontSize: "0.75rem", color: "#94a3b8", textAlign: "center", marginTop: "8px" }}>
             Token sẽ tự động được làm mới khi còn 5 phút hoặc ít hơn trước khi hết hạn
           </p>
+        </div>
+
+        <div style={{
+          marginTop: "24px",
+          background: "white",
+          borderRadius: "12px",
+          padding: "20px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+        }}>
+          <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "16px", color: "#0f172a" }}>Đồng bộ Lark</h3>
+
+          <p style={{ fontSize: "0.85rem", color: "#64748b", marginBottom: "16px" }}>
+            Đồng bộ toàn bộ phòng ban và nhân viên từ Lark Suite vào database.
+          </p>
+
+          <button
+            onClick={syncAll}
+            disabled={isSyncing}
+            style={{
+              width: "100%",
+              padding: "12px 24px",
+              background: isSyncing ? "#94a3b8" : "#10b981",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              fontWeight: 600,
+              fontSize: "0.95rem",
+              cursor: isSyncing ? "not-allowed" : "pointer",
+              transition: "background 0.2s",
+            }}
+          >
+            {isSyncing ? "Đang đồng bộ..." : "Đồng bộ Phòng ban & Nhân viên"}
+          </button>
+
+          {syncResult && (
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div style={{ background: "#f0fdf4", padding: "12px 16px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>Phòng ban - Mới</div>
+                  <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#10b981" }}>+{syncResult.departments.inserted}</div>
+                </div>
+                <div style={{ background: "#eff6ff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>Phòng ban - Cập nhật</div>
+                  <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#3b82f6" }}>~{syncResult.departments.updated}</div>
+                </div>
+                <div style={{ background: "#f0fdf4", padding: "12px 16px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>Nhân viên - Mới</div>
+                  <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#10b981" }}>+{syncResult.employees.inserted}</div>
+                </div>
+                <div style={{ background: "#eff6ff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>Nhân viên - Cập nhật</div>
+                  <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#3b82f6" }}>~{syncResult.employees.updated}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: "12px", padding: "10px 16px", background: "#f8fafc", borderRadius: "8px", textAlign: "center" }}>
+                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                  Hoàn tất trong <strong>{syncResult.duration_ms / 1000}s</strong>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {syncError && (
+            <div style={{
+              marginTop: "16px",
+              padding: "12px 16px",
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: "8px",
+              color: "#dc2626",
+              fontSize: "0.85rem",
+            }}>
+              Lỗi: {syncError}
+            </div>
+          )}
         </div>
 
         <div style={{ textAlign: "center", marginTop: "24px" }}>
