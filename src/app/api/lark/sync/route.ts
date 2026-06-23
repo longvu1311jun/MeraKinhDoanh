@@ -15,9 +15,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const tenant = tenantToken || await getAppAccessToken();
-
-    const result = await runLarkSyncJob(tenant, userToken);
+    const result = await runLarkSyncJob(userToken, userToken);
 
     return NextResponse.json({
       success: true,
